@@ -1,0 +1,129 @@
+---
+title: "Pareto Charts" 
+author: "Bova"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    df_print: paged
+  html_notebook:
+    df_print: paged
+---
+
+# Introduction
+This notebood demonstrates a few different methods of producing pareto charts for evaluating sales by customer.
+
+# Setup
+
+## Initialize Libraries
+```{r}
+library(readr)
+library(tidyverse)
+library(ggplot2)
+library(ggQC)
+library(stringr)
+options(scipen = 999, digits = 0)
+```
+
+## Create simulated data set
+Create a data frame of 100 customers with randomly generated sales volumes. The customers are also randomly assigned to a customer group (Domestic or International)
+```{r}
+set.seed(1955)
+N <- 100
+cust_group_factor <- as.factor(c("Domestic", "International"))
+sales_hist <- data.frame(sales = 10^(rnorm(N, log10(75000), log10(12))),
+                            cust_group = sample(cust_group_factor, N, replace = TRUE),
+                            cust_id = paste0("cid", str_pad(as.character(seq(1:N)), 3, side = "left", pad = "0")))
+
+qplot(sales_hist$sales, color = I("black"))
+
+sales_hist <- sales_hist %>% group_by(cust_id) %>%
+  summarize(total_sales = sum(sales), cg = first(cust_group)) %>%
+  arrange(desc(total_sales)) %>%
+  mutate(cum_sales = cumsum(total_sales))%>%
+  mutate(Customer = factor(cust_id, levels = cust_id)) %>%
+  slice_head(n = 50) 
+
+```
+Plot a histogram of the sales data to get an initial view. 
+
+# Pareto Charts
+
+## Chart using stat_pareto from ggplot
+
+Bar fill is preset based on percent of observations.  
+Cum percent is calculated by the stat_pareto function. The top 25 customers graph reports the cum percent for that subgroup, not the entire population.
+
+```{r}
+sales_hist %>% slice_head(n = 25) %>%
+  ggplot(aes(x=Customer, y=total_sales))+
+  # geom_bar(aes(fill = cg), stat="identity") +
+  stat_pareto(point.size = 2,
+              point.color = "red",
+              bars.fill = c("blue","orange"))+
+  theme(axis.text.x=element_text(angle=90,hjust=1))+
+  labs(title = "Customer Pareto",
+       subtitle = ("Top 25 Customers"))
+```
+
+
+## Chart using ggplot but without stat_pareto  
+
+This chart takes a little more code, but allows more flexibility to fill bars with the customer group.
+```{r}
+sales_hist %>% slice_head(n = 25) %>%
+  ggplot(aes(x=Customer))+
+  geom_bar(aes(y=total_sales, fill = cg), stat="identity") +
+  geom_point(aes(y=cum_sales)) +
+  geom_path(aes(y=cum_sales), group = 1) +
+  scale_y_continuous(sec.axis = sec_axis(~. / max(sales_hist$cum_sales), labels = scales::percent))+
+  theme(axis.text.x=element_text(angle=90,hjust=1))+
+  labs(title = "Customer Pareto",
+       subtitle = ("Top 25 Customers"))
+```
+
+
+
+## Chart using ggplot with correct cum percent
+
+There are actually 100 customers in our dataframe, but we only graphed the top 25. The cumulative percentages shown in the above charts are not correct for the entire population of customers. This graph is correctly showing the cumulative percent for the entire population of customers versus the top 25 that are used in the graph.
+
+```{r}
+brks <- c(seq(0, 1.0, 0.05)) #used to specify where we want the breaks on the secondary y axis
+sales_hist %>%  slice_head(n = 25) %>%
+  ggplot(aes(x=Customer))+
+  geom_bar(aes(y=total_sales, fill = cg), stat="identity") +
+  geom_point(aes(y=cum_sales)) +
+  geom_path(aes(y=cum_sales), group = 1) +
+  scale_y_continuous(sec.axis = sec_axis(~. / max(sales_hist$cum_sales), labels = scales::percent, breaks = brks))+
+  theme(axis.text.x=element_text(angle=90,hjust=1))+
+  labs(title = "Customer Pareto",
+       subtitle = ("Top 25 Customers"),
+       fill = "Customer\nGroup",
+       y = "Tons Shipped 2019",
+       x = "Customer ID")
+```
+
+## Chart using ggplot with correct cum percent for all customers
+
+Same chart as above but with all customers graphed
+
+```{r fig.width=12}
+brks <- c(seq(0, 1.0, 0.05)) #used to specify where we want the breaks on the secondary y axis
+sales_hist %>%
+  ggplot(aes(x=Customer))+
+  geom_bar(aes(y=total_sales, fill = cg), stat="identity") +
+  geom_point(aes(y=cum_sales)) +
+  geom_path(aes(y=cum_sales), group = 1) +
+  scale_y_continuous(sec.axis = sec_axis(~. / max(sales_hist$cum_sales), labels = scales::percent, breaks = brks))+
+  theme(axis.text.x=element_text(angle=90,hjust=1))+
+  labs(title = "Customer Pareto",
+       subtitle = ("All Customers"),
+       fill = "Customer\nGroup",
+       y = "Tons Shipped 2019",
+       x = "Customer ID")
+```
+
+
+
+
+

@@ -2,6 +2,8 @@ library(readr)
 library(tidyverse)
 library(ggplot2)
 library(ggQC)
+library(stringr)
+options(scipen = 999)
 
 #Pareto Chart using stat_pareto.
 #Bar fill is preset based on percent of observations
@@ -24,7 +26,7 @@ sales_hist %>% group_by(Customer) %>%
 
 #using ggplot
 #
-options(scipen = 999)
+
 sales_hist %>% group_by(Customer) %>%
   summarize(total_quantity = sum(Quantity), cg = first(customer_group)) %>%
   arrange(desc(total_quantity)) %>%
@@ -78,5 +80,27 @@ sh2 %>%  slice_head(n = 50) %>%
        y = "Tons Shipped 2019",
        x = "Customer ID")
 
+
+#code to generate sales data
+set.seed(1985)
+N <- 100
+#n <- 10^6
+sales <- 10^(rnorm(N, log10(45000), log10(3)))
+qplot(log10(sales), color = I("black"))
+qplot(sales, color = I("black"))
+
+#generate a random customer group - Domestic or International
+cust_group_factor <- as.factor(c("Domestic", "International"))
+cust_group <- sample(cust_group_factor, N, replace = TRUE)
+
+#Generate or select from list of customer names
+cust_id <- paste0("cid", str_pad(as.character(seq(1:N)), 3, side = "left", pad = "0"))
+
+sales_hist <- data.frame(sales = 10^(rnorm(N, log10(45000), log10(3))),
+                            cust_group = sample(cust_group_factor, N, replace = TRUE),
+                            cust_id = paste0("cid", str_pad(as.character(seq(1:N)), 3, side = "left", pad = "0")))
+
+qplot(log10(sales_hist$sales), color = I("black"))
+qplot(sales_hist$sales, color = I("black"))
 
 
